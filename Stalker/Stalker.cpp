@@ -8,7 +8,6 @@
 #include <codecvt>
 #include <iomanip>
 #include <limits>
-#include <map>
 
 using namespace std;
 
@@ -31,35 +30,84 @@ std::string ws2s(const std::wstring& wstr) {
     return converterX.to_bytes(wstr);
 }
 
-// Функции сравнения
-bool compareByFirstName(const Person& a, const Person& b) {
-    if (a.firstName != b.firstName) return a.firstName < b.firstName;
-    if (a.lastName != b.lastName) return a.lastName < b.lastName;
+// Функция сравнения
+bool compareByLocale(const std::string& a, const std::string& b) {
+    //if (a.compare(b)) return true;
+    const auto data_a = a.data();
+    const auto data_b = b.data();
+    const auto len_a = a.length();
+    const auto len_b = b.length();
+    const auto min_len = std::min(len_a, len_b);
+
+    for (auto i = 0; i < min_len; i++){
+        if (data_a[i] < data_b[i]) {
+            return true;
+        }
+        else if (data_a[i] > data_b[i]) {
+            return false;
+        }
+    }
+    // Если префиксы совпадают, то коротка строка считается меньшей
+    return len_a < len_b;
+}
+
+// Функции сравнения для Person
+bool compareByFirstNameLocale(const Person& a, const Person& b) {
+    if (a.firstName != b.firstName) return compareByLocale(a.firstName, b.firstName);
+    if (a.lastName != b.lastName) return compareByLocale(a.lastName, b.lastName);
     return a.phoneNumber < b.phoneNumber;
 }
 
-bool compareByLastName(const Person& a, const Person& b) {
-    if (a.lastName != b.lastName) return a.lastName < b.lastName;
-    if (a.firstName != b.firstName) return a.firstName < b.firstName;
+bool compareByLastNameLocale(const Person& a, const Person& b) {
+    if (a.lastName != b.lastName) return compareByLocale(a.lastName, b.lastName);
+    if (a.firstName != b.firstName) return compareByLocale(a.firstName, b.firstName);
     return a.phoneNumber < b.phoneNumber;
 }
 
+// Функция сравнения для номера телефона (как строка)
 bool compareByPhoneNumber(const Person& a, const Person& b) {
     return a.phoneNumber < b.phoneNumber;
 }
 
 // Функция для вывода таблицы
+#define RED "\033[31m"
+#define RESET "\033[0m"
 void printTable(const std::vector<Person>& people) {
-    std::wcout << L"--------------------------------------------------" << std::endl;
-    std::wcout << std::left << std::setw(20) << L"Фамилия" << std::setw(20) << L"Имя" << std::setw(15) << L"Телефон" << std::endl;
-    std::wcout << L"--------------------------------------------------" << std::endl;
-    for (const auto& person : people) {
-        std::wcout << std::left << std::setw(20) << s2ws(person.firstName) << std::setw(20) << s2ws(person.lastName)
-            << std::setw(15) << s2ws(person.phoneNumber) << std::endl;
+    if (people.empty()) {
+        std::wcout << L"База данных пуста." << std::endl;
+        return;
     }
-    std::wcout << L"--------------------------------------------------" << std::endl;
-}
 
+    int lastNameWidth = 20;
+    int firstNameWidth = 20;
+    int phoneWidth = 15;
+    int totalWidth = lastNameWidth + firstNameWidth + phoneWidth + 6; // +6 для разделителей
+
+    std::wcout << RED; // Начало красного цвета
+    std::wcout << L"┌";
+    for (int i = 0; i < totalWidth - 2; ++i) std::wcout << L"─";
+    std::wcout << L"┐" << RESET << std::endl; // Верхняя рамка
+
+    std::wcout << RED << L"│" << RESET;
+    std::wcout << std::left << std::setw(lastNameWidth) << L"Фамилия" << RED << L"│" << RESET;
+    std::wcout << std::left << std::setw(firstNameWidth) << L"Имя" << RED << L"│" << RESET;
+    std::wcout << std::left << std::setw(phoneWidth) << L"Телефон" << RED << L"│" << RESET << std::endl;
+
+    std::wcout << RED << L"├";
+    for (int i = 0; i < totalWidth - 2; ++i) std::wcout << L"─";
+    std::wcout << L"┤" << RESET << std::endl; // Разделитель заголовка
+
+    for (const auto& person : people) {
+        std::wcout << RED << L"│" << RESET;
+        std::wcout << std::left << std::setw(lastNameWidth) << s2ws(person.lastName) << RED << L"│" << RESET;
+        std::wcout << std::left << std::setw(firstNameWidth) << s2ws(person.firstName) << RED << L"│" << RESET;
+        std::wcout << std::left << std::setw(phoneWidth) << s2ws(person.phoneNumber) << RED << L"│" << RESET << std::endl;
+    }
+
+    std::wcout << RED << L"└";
+    for (int i = 0; i < totalWidth - 2; ++i) std::wcout << L"─";
+    std::wcout << L"┘" << RESET << std::endl; // Нижняя рамка
+}
 
 // Функция для чтения данных из файла
 std::vector<Person> readFromFile(const std::string& filename) {
@@ -95,14 +143,16 @@ std::vector<Person> readFromFile(const std::string& filename) {
 }
 
 int main() {
-    std::locale::global(std::locale("ru_RU.UTF-8"));
-    std::wcout.imbue(std::locale("ru_RU.UTF-8"));
-    std::wcin.imbue(std::locale("ru_RU.UTF-8"));
-    std::wcerr.imbue(std::locale("ru_RU.UTF-8"));
+    std::locale::global(std::locale("")); // Устанавливаем локаль пользователя по умолчанию
+    std::locale loc = std::locale(""); // Создаем объект локали
+
+    std::wcout.imbue(loc);
+    std::wcin.imbue(loc);
+    std::wcerr.imbue(loc);
 
     std::vector<Person> people = readFromFile("input.txt");
     if (people.empty()) {
-        return 1; // Завершаем программу, если не удалось прочитать файл
+        return 1;
     }
 
     int choice;
@@ -110,8 +160,8 @@ int main() {
 
     while (continueWork) {
         std::wcout << L"Выберите действие:" << std::endl;
-        std::wcout << L"1 - Сортировать по имени" << std::endl;
-        std::wcout << L"2 - Сортировать по фамилии" << std::endl;
+        std::wcout << L"1 - Сортировать по фамилии" << std::endl;
+        std::wcout << L"2 - Сортировать по имени" << std::endl;
         std::wcout << L"3 - Сортировать по телефону" << std::endl;
         std::wcout << L"0 - Выход" << std::endl;
         std::wcout << L"Ввод: ";
@@ -125,15 +175,19 @@ int main() {
 
         switch (choice) {
         case 1:
-            sort(people.begin(), people.end(), compareByFirstName);
+            std::sort(people.begin(), people.end(), [&](const Person& a, const Person& b) {
+                return compareByFirstNameLocale(a, b);
+                });
             printTable(people);
             break;
         case 2:
-            sort(people.begin(), people.end(), compareByLastName);
+            std::sort(people.begin(), people.end(), [&](const Person& a, const Person& b) {
+                return compareByLastNameLocale(a, b);
+                });
             printTable(people);
             break;
         case 3:
-            sort(people.begin(), people.end(), compareByPhoneNumber);
+            std::sort(people.begin(), people.end(), compareByPhoneNumber); // Теперь функция определена
             printTable(people);
             break;
         case 0:
